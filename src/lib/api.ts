@@ -1,6 +1,5 @@
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL!;
 
-// Raw API shape (যেভাবে API থেকে আসে)
 type RawProduct = {
   id: number;
   slug: string;
@@ -24,12 +23,12 @@ type RawProduct = {
 };
 
 type RawCategory = {
+  id?: string;
   slug: string;
   nameBn: string;
   icon: string;
 };
 
-// Cleaned shape (আমাদের app-এ যেভাবে ব্যবহার করবো)
 export type Product = {
   id: number;
   slug: string;
@@ -67,7 +66,7 @@ function normalizeProduct(raw: RawProduct): Product {
     unit: raw.unit,
     todayPrice: raw.today,
     changePercent: raw.change.pct,
-    markets: raw.markets.map((m) => ({
+    markets: (raw.markets ?? []).map((m) => ({
       bazar: m.market,
       district: m.division,
       min: m.min,
@@ -77,35 +76,85 @@ function normalizeProduct(raw: RawProduct): Product {
   };
 }
 
+function normalizeCategory(raw: RawCategory): Category {
+  return {
+    slug: raw.slug,
+    name: raw.nameBn,
+    icon: raw.icon,
+  };
+}
+
+// In-memory cache with TTL
+const cache = new Map<string, { data: unknown; timestamp: number }>();
+const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+
 async function getJson<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, { cache: "no-store" });
-  if (!res.ok) throw new Error(`API error: ${res.status}`);
-  return res.json();
+  const url = `${BASE_URL}${path}`;
+
+  // Return cached data if fresh
+  const cached = cache.get(url);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.data as T;
+  }
+
+  try {
+    const res = await fetch(url, { cache: "no-store" });
+
+    if (res.status === 429) {
+      // Rate limited — use expired cache if available
+      if (cached) {
+        console.warn("429 — using expired cache for", url);
+        return cached.data as T;
+      }
+      throw new Error(
+        "API rate limit exceeded. Please wait a few minutes and try again."
+      );
+    }
+
+    if (!res.ok) {
+      throw new Error(`API error: ${res.status} on ${url}`);
+    }
+
+    const data = await res.json();
+    cache.set(url, { data, timestamp: Date.now() });
+    return data as T;
+  } catch (err) {
+    // Network error — fall back to cache
+    if (cached) {
+      console.warn("Network error — using cache for", url);
+      return cached.data as T;
+    }
+    throw err;
+  }
 }
 
 export const api = {
   getProducts: async (): Promise<Product[]> => {
     const raw = await getJson<RawProduct[]>("/products");
-    return raw.map(normalizeProduct);
+    return (raw ?? []).map(normalizeProduct);
   },
 
   getProduct: async (slug: string): Promise<Product> => {
-    const raw = await getJson<RawProduct>(`/products/${slug}`);
-    return normalizeProduct(raw);
+    // API doesn't support /products/:slug — fetch all and filter
+    const raw = await getJson<RawProduct[]>("/products");
+    const found = (raw ?? []).find((p) => p.slug === slug);
+    if (!found) throw new Error(`Product not found: ${slug}`);
+    return normalizeProduct(found);
   },
 
   getCategories: async (): Promise<Category[]> => {
     const raw = await getJson<RawCategory[]>("/categories");
-    return raw.map((c) => ({ slug: c.slug, name: c.nameBn, icon: c.icon }));
+    return (raw ?? []).map(normalizeCategory);
   },
 
   getCategory: async (slug: string): Promise<Category> => {
     const raw = await getJson<RawCategory>(`/categories/${slug}`);
-    return { slug: raw.slug, name: raw.nameBn, icon: raw.icon };
+    return normalizeCategory(raw);
   },
 
   getProductsByCategory: async (slug: string): Promise<Product[]> => {
     const raw = await getJson<RawProduct[]>(`/products?category=${slug}`);
+    if (!Array.isArray(raw)) return [];
     return raw.map(normalizeProduct);
   },
 };

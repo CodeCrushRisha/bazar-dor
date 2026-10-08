@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { api, Product } from "@/lib/api";
-import { formatChange, toBn } from "@/lib/utils";
+import { formatChange, toBn, unitBn } from "@/lib/utils";
 import SkeletonCard from "@/components/SkeletonCard";
 
 export default function ProductDetailPage() {
@@ -43,7 +43,10 @@ export default function ProductDetailPage() {
       <div className="max-w-6xl mx-auto px-4 py-16 text-center">
         <div className="text-6xl mb-4">😕</div>
         <h1 className="text-2xl font-bold mb-2">পণ্য খুঁজে পাওয়া যায়নি</h1>
-        <Link href="/" className="btn btn-primary">
+        <Link
+          href="/"
+          className="btn bg-green-600 hover:bg-green-700 text-white border-0"
+        >
           হোম পেজে ফিরে যান
         </Link>
       </div>
@@ -73,20 +76,22 @@ export default function ProductDetailPage() {
           href={`/category/${product.category}`}
           className="hover:underline"
         >
-          {product.category}
+          {product.categoryNameBn}
         </Link>{" "}
         › <span>{product.name}</span>
       </nav>
 
-      <div className="card bg-base-100 shadow-sm mb-6">
+      <div className="card bg-white rounded-2xl shadow-sm mb-6">
         <div className="card-body md:flex-row md:items-center gap-6">
           <div className="flex-1">
             <div className="flex items-center gap-4 mb-3">
               <div className="text-5xl">{product.emoji}</div>
               <div>
-                <h1 className="text-2xl font-bold">{product.name}</h1>
+                <h1 className="text-2xl font-bold text-gray-900">
+                  {product.name}
+                </h1>
                 <p className="text-sm text-gray-500">
-                  {product.unit} • {product.category}
+                  {unitBn(product.unit)} • {product.categoryNameBn}
                 </p>
               </div>
             </div>
@@ -95,12 +100,14 @@ export default function ProductDetailPage() {
                 "বাজারে আজকের দাম ও পরিবর্তনের সারসংক্ষেপ।"}
             </p>
           </div>
-          <div className="bg-base-200 rounded-xl p-5 text-center min-w-40">
+          <div className="bg-gray-100 rounded-2xl p-5 text-center min-w-40">
             <div className="text-xs text-gray-500">আজকের দাম</div>
-            <div className="text-2xl font-bold">
+            <div className="text-2xl font-bold text-gray-900">
               {toBn(product.todayPrice)} টাকা
             </div>
-            <div className="text-xs text-gray-500">টাকা / {product.unit}</div>
+            <div className="text-xs text-gray-500">
+              টাকা / {unitBn(product.unit)}
+            </div>
             <div className={`text-sm font-semibold mt-1 ${ch.color}`}>
               {ch.text}
             </div>
@@ -108,7 +115,7 @@ export default function ProductDetailPage() {
         </div>
       </div>
 
-      <div className="card bg-base-100 shadow-sm mb-6">
+      <div className="card bg-white rounded-2xl shadow-sm mb-6">
         <div className="card-body">
           <h2 className="font-bold text-lg mb-3">দামের সারসংক্ষেপ</h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -117,12 +124,9 @@ export default function ProductDetailPage() {
               { label: "সর্বোচ্চ দাম", value: max, note: "সর্বোচ্চ বাজার" },
               { label: "গড় দাম", value: avg, note: "সব বাজারের গড়" },
             ].map((s) => (
-              <div
-                key={s.label}
-                className="border border-base-300 rounded-xl p-4"
-              >
+              <div key={s.label} className="bg-gray-50 rounded-2xl p-4">
                 <div className="text-xs text-gray-500">{s.label}</div>
-                <div className="text-2xl font-bold text-primary">
+                <div className="text-2xl font-bold text-green-600">
                   {toBn(s.value)} টাকা
                 </div>
                 <div className="text-xs text-gray-500">{s.note}</div>
@@ -132,7 +136,7 @@ export default function ProductDetailPage() {
         </div>
       </div>
 
-      <div className="card bg-base-100 shadow-sm">
+      <div className="card bg-white rounded-2xl shadow-sm">
         <div className="card-body">
           <h2 className="font-bold text-lg mb-3">বাজারভিত্তিক আজকের দাম</h2>
           <div className="overflow-x-auto">

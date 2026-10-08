@@ -1,166 +1,137 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { api, Product } from "@/lib/api";
-import { formatChange, toBn } from "@/lib/utils";
+import { api, Category, Product } from "@/lib/api";
+import ProductCard from "@/components/ProductCard";
 import SkeletonCard from "@/components/SkeletonCard";
+import SortDropdown from "@/components/SortDropdown";
+import { sortByPrice, toBn } from "@/lib/utils";
 
-export default function ProductDetailPage() {
+export default function CategoryPage() {
   const { slug } = useParams<{ slug: string }>();
-  const [product, setProduct] = useState<Product | null>(null);
+  const [category, setCategory] = useState<Category | null>(null);
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sort, setSort] = useState("default");
 
   useEffect(() => {
     let cancelled = false;
-    api
-      .getProduct(slug)
-      .then((p) => {
-        if (!cancelled) setProduct(p);
-      })
-      .catch(() => {
-        if (!cancelled) setProduct(null);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+
+    const load = async () => {
+      const [catResult, prodsResult] = await Promise.allSettled([
+        api.getCategory(slug),
+        api.getProductsByCategory(slug),
+      ]);
+
+      if (cancelled) return;
+
+      const catData =
+        catResult.status === "fulfilled" ? catResult.value : null;
+      const prodsData =
+        prodsResult.status === "fulfilled" ? prodsResult.value : [];
+
+      if (!catData && prodsData.length > 0) {
+        setCategory({
+          slug,
+          name: prodsData[0].categoryNameBn,
+          icon: prodsData[0].emoji,
+        });
+      } else {
+        setCategory(catData);
+      }
+      setProducts(prodsData);
+      setLoading(false);
+    };
+
+    load();
+
     return () => {
       cancelled = true;
     };
   }, [slug]);
 
+  const sorted = useMemo(
+    () => sortByPrice(products, sort as "default" | "asc" | "desc"),
+    [products, sort]
+  );
+
   if (loading) {
     return (
-      <div className="max-w-6xl mx-auto px-4 py-8 space-y-4">
-        <SkeletonCard />
-        <SkeletonCard />
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        <div className="h-8 w-40 bg-gray-200 rounded mb-6 animate-pulse" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <SkeletonCard key={i} />
+          ))}
+        </div>
       </div>
     );
   }
 
-  if (!product) {
+  if (!category) {
     return (
       <div className="max-w-6xl mx-auto px-4 py-16 text-center">
         <div className="text-6xl mb-4">😕</div>
-        <h1 className="text-2xl font-bold mb-2">পণ্য খুঁজে পাওয়া যায়নি</h1>
-        <Link href="/" className="btn btn-primary">
+        <h1 className="text-2xl font-bold mb-2">
+          ক্যাটাগরি খুঁজে পাওয়া যায়নি
+        </h1>
+        <p className="text-gray-500 mb-6">
+          আপনি যে ক্যাটাগরিটি খুঁজছেন তা বিদ্যমান নেই।
+        </p>
+        <Link
+          href="/"
+          className="btn bg-green-600 hover:bg-green-700 text-white border-0"
+        >
           হোম পেজে ফিরে যান
         </Link>
       </div>
     );
   }
 
-  const ch = formatChange(product.changePercent);
-  const markets = product.markets ?? [];
-  const min = markets.length
-    ? Math.min(...markets.map((m) => m.min))
-    : product.todayPrice;
-  const max = markets.length
-    ? Math.max(...markets.map((m) => m.max))
-    : product.todayPrice;
-  const avg = markets.length
-    ? Math.round(markets.reduce((s, m) => s + m.avg, 0) / markets.length)
-    : product.todayPrice;
-
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
-      <nav className="text-sm text-gray-500 mb-4">
-        <Link href="/" className="hover:underline">
-          হোম
-        </Link>{" "}
-        ›{" "}
-        <Link
-          href={`/category/${product.category}`}
-          className="hover:underline"
-        >
-          {product.category}
-        </Link>{" "}
-        › <span>{product.name}</span>
-      </nav>
-
-      <div className="card bg-base-100 shadow-sm mb-6">
-        <div className="card-body md:flex-row md:items-center gap-6">
-          <div className="flex-1">
-            <div className="flex items-center gap-4 mb-3">
-              <div className="text-5xl">{product.emoji}</div>
-              <div>
-                <h1 className="text-2xl font-bold">{product.name}</h1>
-                <p className="text-sm text-gray-500">
-                  {product.unit} • {product.category}
-                </p>
-              </div>
-            </div>
-            <p className="text-gray-600">
-              {product.description ??
-                "বাজারে আজকের দাম ও পরিবর্তনের সারসংক্ষেপ।"}
+      <div className="card bg-white rounded-2xl shadow-sm mb-6">
+        <div className="card-body flex-row items-center gap-4">
+          <div className="text-4xl">{category.icon}</div>
+          <div>
+            <h1 className="text-xl font-bold text-gray-900">
+              {category.name}
+            </h1>
+            <p className="text-sm text-gray-500">
+              এই ক্যাটাগরির সর্বশেষ দাম ও পরিবর্তন
             </p>
           </div>
-          <div className="bg-base-200 rounded-xl p-5 text-center min-w-40">
-            <div className="text-xs text-gray-500">আজকের দাম</div>
-            <div className="text-2xl font-bold">
-              {toBn(product.todayPrice)} টাকা
-            </div>
-            <div className="text-xs text-gray-500">টাকা / {product.unit}</div>
-            <div className={`text-sm font-semibold mt-1 ${ch.color}`}>
-              {ch.text}
-            </div>
-          </div>
         </div>
       </div>
 
-      <div className="card bg-base-100 shadow-sm mb-6">
-        <div className="card-body">
-          <h2 className="font-bold text-lg mb-3">দামের সারসংক্ষেপ</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {[
-              { label: "সর্বনিম্ন দাম", value: min, note: "সর্বনিম্ন বাজার" },
-              { label: "সর্বোচ্চ দাম", value: max, note: "সর্বোচ্চ বাজার" },
-              { label: "গড় দাম", value: avg, note: "সব বাজারের গড়" },
-            ].map((s) => (
-              <div
-                key={s.label}
-                className="border border-base-300 rounded-xl p-4"
-              >
-                <div className="text-xs text-gray-500">{s.label}</div>
-                <div className="text-2xl font-bold text-primary">
-                  {toBn(s.value)} টাকা
-                </div>
-                <div className="text-xs text-gray-500">{s.note}</div>
-              </div>
-            ))}
-          </div>
-        </div>
+      <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
+        <p className="text-sm text-gray-500">
+          মোট {toBn(sorted.length)} টি পণ্য দেখানো হচ্ছে
+        </p>
+        <SortDropdown value={sort} onChange={setSort} />
       </div>
 
-      <div className="card bg-base-100 shadow-sm">
-        <div className="card-body">
-          <h2 className="font-bold text-lg mb-3">বাজারভিত্তিক আজকের দাম</h2>
-          <div className="overflow-x-auto">
-            <table className="table table-zebra">
-              <thead>
-                <tr>
-                  <th>বাজার</th>
-                  <th>বিভাগ</th>
-                  <th>সর্বনিম্ন</th>
-                  <th>সর্বোচ্চ</th>
-                  <th>গড়</th>
-                </tr>
-              </thead>
-              <tbody>
-                {markets.map((m, i) => (
-                  <tr key={i}>
-                    <td>{m.bazar}</td>
-                    <td>{m.district}</td>
-                    <td>{toBn(m.min)} টাকা</td>
-                    <td>{toBn(m.max)} টাকা</td>
-                    <td>{toBn(m.avg)} টাকা</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+      {sorted.length === 0 ? (
+        <div className="text-center py-16">
+          <div className="text-6xl mb-4">📭</div>
+          <p className="text-gray-500 mb-6">
+            এই ক্যাটাগরিতে কোনো পণ্য নেই।
+          </p>
+          <Link
+            href="/"
+            className="btn bg-green-600 hover:bg-green-700 text-white border-0"
+          >
+            হোম পেজে ফিরে যান
+          </Link>
         </div>
-      </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {sorted.map((p) => (
+            <ProductCard key={p.id} p={p} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
