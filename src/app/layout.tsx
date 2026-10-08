@@ -26,7 +26,7 @@ export default function RootLayout({
         className={`${hind.className} bg-base-200 min-h-screen flex flex-col`}
       >
         <Navbar />
-        <main className="flex-1">{children}</main>
+        <main className="flex-1 pt-[130px]">{children}</main>
         <Footer />
         <Toaster
           position="top-center"

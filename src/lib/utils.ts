@@ -36,7 +36,9 @@ export function sortByPrice(
 ) {
   if (order === "default") return products;
   return [...products].sort((a, b) =>
-    order === "asc" ? a.todayPrice - b.todayPrice : b.todayPrice - a.todayPrice
+    order === "asc"
+      ? a.todayPrice - b.todayPrice
+      : b.todayPrice - a.todayPrice
   );
 }
 
@@ -69,3 +71,13 @@ export const bnDate = () => {
     months[d.getMonth()]
   }, ${toBn(d.getFullYear())}`;
 };
+
+export function unitBn(unit: string): string {
+  const map: Record<string, string> = {
+    kg: "প্রতি কেজি",
+    litre: "প্রতি লিটার",
+    dozen: "প্রতি ডজন",
+    piece: "প্রতি পিস",
+  };
+  return map[unit] ?? `প্রতি ${unit}`;
+}
