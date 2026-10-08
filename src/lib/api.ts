@@ -84,31 +84,38 @@ function normalizeCategory(raw: RawCategory): Category {
   };
 }
 
-// In-memory cache with TTL
-const cache = new Map<string, { data: unknown; timestamp: number }>();
-const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+// Global in-memory cache (works across requests on Vercel)
+const globalCache = new Map<string, { data: unknown; timestamp: number }>();
+const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+
+// Longer TTL for products list (since everything depends on it)
+const PRODUCTS_TTL = 60 * 60 * 1000; // 1 hour
 
 async function getJson<T>(path: string): Promise<T> {
   const url = `${BASE_URL}${path}`;
 
+  const ttl = path === "/products" ? PRODUCTS_TTL : CACHE_TTL;
+
   // Return cached data if fresh
-  const cached = cache.get(url);
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+  const cached = globalCache.get(url);
+  if (cached && Date.now() - cached.timestamp < ttl) {
     return cached.data as T;
   }
 
   try {
-    const res = await fetch(url, { cache: "no-store" });
+    const res = await fetch(url, {
+      cache: "no-store",
+      headers: {
+        "User-Agent": "BazarDor-App",
+      },
+    });
 
     if (res.status === 429) {
-      // Rate limited — use expired cache if available
       if (cached) {
         console.warn("429 — using expired cache for", url);
         return cached.data as T;
       }
-      throw new Error(
-        "API rate limit exceeded. Please wait a few minutes and try again."
-      );
+      throw new Error("API rate limit exceeded — please wait a few minutes");
     }
 
     if (!res.ok) {
@@ -116,10 +123,9 @@ async function getJson<T>(path: string): Promise<T> {
     }
 
     const data = await res.json();
-    cache.set(url, { data, timestamp: Date.now() });
+    globalCache.set(url, { data, timestamp: Date.now() });
     return data as T;
   } catch (err) {
-    // Network error — fall back to cache
     if (cached) {
       console.warn("Network error — using cache for", url);
       return cached.data as T;
@@ -135,7 +141,6 @@ export const api = {
   },
 
   getProduct: async (slug: string): Promise<Product> => {
-    // API doesn't support /products/:slug — fetch all and filter
     const raw = await getJson<RawProduct[]>("/products");
     const found = (raw ?? []).find((p) => p.slug === slug);
     if (!found) throw new Error(`Product not found: ${slug}`);
@@ -153,8 +158,8 @@ export const api = {
   },
 
   getProductsByCategory: async (slug: string): Promise<Product[]> => {
-    const raw = await getJson<RawProduct[]>(`/products?category=${slug}`);
-    if (!Array.isArray(raw)) return [];
-    return raw.map(normalizeProduct);
+    // Fetch all products, filter by category — avoids extra API call
+    const all = await api.getProducts();
+    return all.filter((p) => p.category === slug);
   },
 };
