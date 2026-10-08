@@ -1,11 +1,11 @@
 "use client";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "@/lib/auth-client";
 import toast from "react-hot-toast";
 
-export default function SignInPage() {
+function SignInForm() {
   const router = useRouter();
   const params = useSearchParams();
   const redirect = params.get("redirect") ?? "/";
@@ -41,7 +41,7 @@ export default function SignInPage() {
       </p>
       <form
         onSubmit={submit}
-        className="card bg-base-100 shadow-sm p-6 space-y-4"
+        className="card bg-white rounded-2xl shadow-sm p-6 space-y-4"
       >
         <div>
           <label className="label">ইমেইল</label>
@@ -65,7 +65,10 @@ export default function SignInPage() {
             placeholder="কমপক্ষে ৮ অক্ষর"
           />
         </div>
-        <button disabled={loading} className="btn btn-primary w-full">
+        <button
+          disabled={loading}
+          className="btn w-full bg-green-600 hover:bg-green-700 text-white border-0"
+        >
           {loading ? <span className="loading loading-spinner" /> : "সাইন ইন"}
         </button>
         <div className="divider text-xs">অথবা</div>
@@ -98,5 +101,25 @@ export default function SignInPage() {
         </Link>
       </div>
     </div>
+  );
+}
+
+export default function SignInPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="max-w-md mx-auto px-4 py-12">
+          <div className="card bg-white rounded-2xl shadow-sm p-6">
+            <div className="skeleton h-8 w-32 mx-auto mb-4" />
+            <div className="skeleton h-4 w-full mb-2" />
+            <div className="skeleton h-12 w-full mb-4" />
+            <div className="skeleton h-12 w-full mb-4" />
+            <div className="skeleton h-12 w-full" />
+          </div>
+        </div>
+      }
+    >
+      <SignInForm />
+    </Suspense>
   );
 }

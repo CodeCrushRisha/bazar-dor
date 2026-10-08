@@ -1,69 +1,48 @@
 "use client";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { signUp, signIn } from "@/lib/auth-client";
+import { useRouter, useSearchParams } from "next/navigation";
+import { signIn } from "@/lib/auth-client";
 import toast from "react-hot-toast";
 
-export default function SignUpPage() {
+function SignInForm() {
   const router = useRouter();
-  const [form, setForm] = useState({
-    name: "",
-    email: "",
-    password: "",
-    confirm: "",
-  });
+  const params = useSearchParams();
+  const redirect = params.get("redirect") ?? "/";
+  const [form, setForm] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (form.password !== form.confirm)
-      return toast.error("পাসওয়ার্ড মিলছে না");
-    if (form.password.length < 8)
-      return toast.error("পাসওয়ার্ড কমপক্ষে ৮ অক্ষর হতে হবে");
-
     setLoading(true);
-    const { error } = await signUp.email({
-      name: form.name,
+    const { error } = await signIn.email({
       email: form.email,
       password: form.password,
     });
     setLoading(false);
-
     if (error) {
-      toast.error(error.message ?? "রেজিস্ট্রেশন ব্যর্থ হয়েছে");
+      toast.error(error.message ?? "সাইন ইন ব্যর্থ হয়েছে");
     } else {
-      toast.success("রেজিস্ট্রেশন সফল! সাইন ইন করুন।");
-      router.push("/signin");
+      toast.success("সফলভাবে সাইন ইন হয়েছে");
+      router.push(redirect);
+      router.refresh();
     }
   };
 
   const social = async (provider: "google" | "github") => {
-    await signIn.social({ provider, callbackURL: "/" });
+    await signIn.social({ provider, callbackURL: redirect });
   };
 
   return (
     <div className="max-w-md mx-auto px-4 py-12">
-      <h1 className="text-2xl font-bold text-center mb-2">
-        অ্যাকাউন্ট তৈরি করুন
-      </h1>
+      <h1 className="text-2xl font-bold text-center mb-2">সাইন ইন</h1>
       <p className="text-sm text-gray-500 text-center mb-6">
-        দামের বিস্তারিত ও বাজার তুলনা দেখতে রেজিস্টার করুন।
+        বিস্তারিত দাম, বাজার তুলনা ও প্রোফাইল দেখতে অ্যাকাউন্টে ঢুকুন।
       </p>
       <form
         onSubmit={submit}
-        className="card bg-base-100 shadow-sm p-6 space-y-4"
+        className="card bg-white rounded-2xl shadow-sm p-6 space-y-4"
       >
-        <div>
-          <label className="label">নাম</label>
-          <input
-            required
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            className="input input-bordered w-full"
-            placeholder="রেজওয়ান আহমেদ"
-          />
-        </div>
         <div>
           <label className="label">ইমেইল</label>
           <input
@@ -86,23 +65,11 @@ export default function SignUpPage() {
             placeholder="কমপক্ষে ৮ অক্ষর"
           />
         </div>
-        <div>
-          <label className="label">পাসওয়ার্ড নিশ্চিত করুন</label>
-          <input
-            type="password"
-            required
-            value={form.confirm}
-            onChange={(e) => setForm({ ...form, confirm: e.target.value })}
-            className="input input-bordered w-full"
-            placeholder="আবার লিখুন"
-          />
-        </div>
-        <button disabled={loading} className="btn btn-primary w-full">
-          {loading ? (
-            <span className="loading loading-spinner" />
-          ) : (
-            "অ্যাকাউন্ট তৈরি করুন"
-          )}
+        <button
+          disabled={loading}
+          className="btn w-full bg-green-600 hover:bg-green-700 text-white border-0"
+        >
+          {loading ? <span className="loading loading-spinner" /> : "সাইন ইন"}
         </button>
         <div className="divider text-xs">অথবা</div>
         <div className="grid grid-cols-2 gap-2">
@@ -122,9 +89,9 @@ export default function SignUpPage() {
           </button>
         </div>
         <p className="text-center text-sm">
-          অ্যাকাউন্ট আছে?{" "}
-          <Link href="/signin" className="link link-primary">
-            সাইন ইন করুন
+          অ্যাকাউন্ট নেই?{" "}
+          <Link href="/signup" className="link link-primary">
+            সাইন আপ করুন
           </Link>
         </p>
       </form>
@@ -134,5 +101,25 @@ export default function SignUpPage() {
         </Link>
       </div>
     </div>
+  );
+}
+
+export default function SignInPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="max-w-md mx-auto px-4 py-12">
+          <div className="card bg-white rounded-2xl shadow-sm p-6">
+            <div className="skeleton h-8 w-32 mx-auto mb-4" />
+            <div className="skeleton h-4 w-full mb-2" />
+            <div className="skeleton h-12 w-full mb-4" />
+            <div className="skeleton h-12 w-full mb-4" />
+            <div className="skeleton h-12 w-full" />
+          </div>
+        </div>
+      }
+    >
+      <SignInForm />
+    </Suspense>
   );
 }
