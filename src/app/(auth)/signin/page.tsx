@@ -111,7 +111,6 @@ export default function SignInPage() {
         <div className="max-w-md mx-auto px-4 py-12">
           <div className="card bg-white rounded-2xl shadow-sm p-6">
             <div className="skeleton h-8 w-32 mx-auto mb-4" />
-            <div className="skeleton h-4 w-full mb-2" />
             <div className="skeleton h-12 w-full mb-4" />
             <div className="skeleton h-12 w-full mb-4" />
             <div className="skeleton h-12 w-full" />
